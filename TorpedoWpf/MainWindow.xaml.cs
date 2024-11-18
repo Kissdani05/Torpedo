@@ -47,8 +47,8 @@ namespace TorpedoWpf
         public MainWindow()
         {
             InitializeComponent();
-            InitializeButtons(LeftButtonGrid, leftMap, isLeftSide: true);
-            InitializeButtons(RightButtonGrid, rightMap, isLeftSide: false);
+            InitializeButtons(gPlayerField, leftMap, isLeftSide: true);
+            InitializeButtons(gOpponentField, rightMap, isLeftSide: false);
 
             // ListBox kiválasztásának eseménykezelője
             ShipListBox.SelectionChanged += ShipListBox_SelectionChanged;
@@ -232,7 +232,7 @@ namespace TorpedoWpf
                 foreach (var pos in ship.Positions)
                 {
                     map[pos.Row, pos.Col] = '\0'; // A mező visszaállítása üresre
-                    GetButtonFromGrid(LeftButtonGrid, pos.Row, pos.Col).Background = Brushes.LightGray; // A gomb színének visszaállítása
+                    GetButtonFromGrid(gPlayerField, pos.Row, pos.Col).Background = Brushes.LightGray; // A gomb színének visszaállítása
                 }
 
                     // Remove the ship from the placedShips list
