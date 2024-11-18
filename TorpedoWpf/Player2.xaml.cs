@@ -1,31 +1,26 @@
-﻿using System.Text;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
 using System.Windows.Shapes;
 
 namespace TorpedoWpf
 {
     /// <summary>
-    /// Interaction logic for MainWindow.xaml
+    /// Interaction logic for Player2.xaml
     /// </summary>
-    public class Ship
-    {
-        public int Length { get; set; }
-        public List<(int Row, int Col)> Positions { get; set; } = new List<(int, int)>();
+    
 
-        public bool IsRow { get; set; } = false;  // Igaz, ha sorban
-        public bool IsCol { get; set; } = false;
-    }
-
-    public partial class MainWindow : Window
+    public partial class Player2 : Window
     {
         private char[,] leftMap = new char[10, 10];
         private char[,] rightMap = new char[10, 10];
@@ -38,7 +33,7 @@ namespace TorpedoWpf
         private Ship currentShip = null;
         private List<Ship> placedShips = new List<Ship>();
 
-        public MainWindow()
+        public Player2()
         {
             InitializeComponent();
             InitializeButtons(gPlayerField, leftMap, isLeftSide: true);
@@ -78,11 +73,15 @@ namespace TorpedoWpf
 
                     if (isLeftSide)
                     {
-                        button.Click += (sender, e) => Button_Click(sender, e, map, currentRow, currentCol);
+                        // Bal oldali mezők csak figyelmeztetést adnak
+                        button.Click += (sender, e) =>
+                        {
+                            MessageBox.Show("Ez a mező zárolva van. Csak a jobb oldalon helyezhetők el hajók.", "Figyelmeztetés", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        };
                     }
                     else
                     {
-                        button.Click += RightButtonGrid_Click;
+                        button.Click += (sender, e) => Button_Click(sender, e, map, currentRow, currentCol);
                     }
 
                     // Gomb hozzáadása a Gridhez
@@ -141,7 +140,7 @@ namespace TorpedoWpf
                 foreach (var pos in ship.Positions)
                 {
                     map[pos.Row, pos.Col] = '\0'; // A mező visszaállítása üresre
-                    GetButtonFromGrid(gPlayerField, pos.Row, pos.Col).Background = Brushes.LightGray; // A gomb színének visszaállítása
+                    GetButtonFromGrid(gOpponentField, pos.Row, pos.Col).Background = Brushes.LightGray; // A gomb színének visszaállítása
                 }
 
                 // Hajó eltávolítása a listából
@@ -159,8 +158,12 @@ namespace TorpedoWpf
 
                 // Eltávolítjuk az összes "X" jelet, hogy ne befolyásolják a későbbi elhelyezést
                 ClearAdjacentMarkings(map);
+
+                return;
             }
-            else if (ShipListBox.SelectedItem != null && map[row, col] != '1' && map[row, col] != 'X')
+
+            // Hajó elhelyezése
+            if (ShipListBox.SelectedItem != null && map[row, col] != '1' && map[row, col] != 'X')
             {
                 if (firstSelection)
                 {
@@ -177,6 +180,7 @@ namespace TorpedoWpf
                 }
             }
         }
+
         private void ClearAdjacentMarkings(char[,] map)
         {
             for (int row = 0; row < 10; row++)
@@ -294,12 +298,5 @@ namespace TorpedoWpf
             gameStarted = true;
             MessageBox.Show("A játék elkezdődött! Mostantól nem változtathatod meg a hajók elhelyezését.", "Játék", MessageBoxButton.OK, MessageBoxImage.Information);
         }
-
-        private void Button_Click_1(object sender, RoutedEventArgs e)
-        {
-            Player2 player = new Player2();
-            player.Show();
-        }
     }
-
 }
