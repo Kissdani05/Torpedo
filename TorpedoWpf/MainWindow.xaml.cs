@@ -43,12 +43,21 @@ namespace TorpedoWpf
             InitializeComponent();
             InitializeButtons(gPlayerField, leftMap, isLeftSide: true);
             InitializeButtons(gOpponentField, rightMap, isLeftSide: false);
+            InitializeRightMap();
 
             // ListBox kiválasztásának eseménykezelője
             ShipListBox.SelectionChanged += ShipListBox_SelectionChanged;
 
             // Ellenőrizzük a gomb láthatóságát az inicializáláskor is
             CheckStartGameButtonVisibility();
+        }
+        private void InitializeRightMap()
+        {
+            // Ellenfél hajóinak manuális elhelyezése (teszteléshez)
+            rightMap[2, 3] = '1'; // Hajó 1. része
+            rightMap[2, 4] = '1'; // Hajó 2. része
+            rightMap[5, 6] = '1'; // Hajó 3. része
+                                  // Add more as needed...
         }
         private void CheckStartGameButtonVisibility()
         {
@@ -93,7 +102,32 @@ namespace TorpedoWpf
 
         private void RightButtonGrid_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show("Ellenfél oldala, ide nem pakolhatsz hajót", "Figyelmeztetés", MessageBoxButton.OK, MessageBoxImage.Warning);
+            if (!gameStarted)
+            {
+                MessageBox.Show("A játék még nem kezdődött el, nem lőhetsz az ellenfél mezőire!", "Figyelmeztetés", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            Button clickedButton = sender as Button;
+            int row = Grid.GetRow(clickedButton);
+            int col = Grid.GetColumn(clickedButton);
+
+            if (rightMap[row, col] == '1') // Találat
+            {
+                clickedButton.Background = Brushes.Green;
+                rightMap[row, col] = 'H'; // Jelöljük a találatot
+                MessageBox.Show("Találat! Eltaláltad az ellenfél hajóját!", "Találat", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            else if (rightMap[row, col] == '\0') // Tévesztés
+            {
+                clickedButton.Background = Brushes.Red;
+                rightMap[row, col] = 'M'; // Jelöljük a tévesztést
+                MessageBox.Show("Tévesztettél! Nincs hajó ezen a mezőn.", "Tévesztés", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            else
+            {
+                MessageBox.Show("Már lőttél erre a mezőre! Válassz másikat.", "Figyelmeztetés", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         private void ShipListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -292,7 +326,7 @@ namespace TorpedoWpf
         {
             StartGameButton.Visibility = Visibility.Collapsed;
             gameStarted = true;
-            MessageBox.Show("A játék elkezdődött! Mostantól nem változtathatod meg a hajók elhelyezését.", "Játék", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("A játék elkezdődött! Mostantól lőhetsz az ellenfél mezőire.", "Játék", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void Button_Click_1(object sender, RoutedEventArgs e)
