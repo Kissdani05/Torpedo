@@ -41,7 +41,7 @@ namespace TorpedoWpf
         private List<Ship> placedShips = new List<Ship>();
 
         private ClientWebSocket _webSocket;
-        private int _playerNumber;
+        private int _playerNumber = 1;
         private int _currentTurn = 1;
 
         public MainWindow()
