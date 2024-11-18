@@ -49,93 +49,13 @@ namespace TorpedoWpf
             InitializeComponent();
             InitializeButtons(gPlayerField, leftMap, isLeftSide: true);
             InitializeButtons(gOpponentField, rightMap, isLeftSide: false);
-            InitializeWebSocket();
+
             // ListBox kiválasztásának eseménykezelője
             ShipListBox.SelectionChanged += ShipListBox_SelectionChanged;
 
             // Ellenőrizzük a gomb láthatóságát az inicializáláskor is
             CheckStartGameButtonVisibility();
         }
-
-        private async void InitializeWebSocket()
-        {
-            try
-            {
-                _webSocket = new ClientWebSocket();
-                await _webSocket.ConnectAsync(new Uri("ws://localhost:5000/"), CancellationToken.None);
-                MessageBox.Show("Connected to server!", "Connection", MessageBoxButton.OK, MessageBoxImage.Information);
-
-                // Start listening for messages
-                _ = ListenToServer();
-
-                // Send a ready message to the server
-                await SendMessageAsync("READY");
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Failed to connect to server: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        private async Task ListenToServer()
-        {
-            var buffer = new byte[1024];
-
-            while (_webSocket.State == WebSocketState.Open)
-            {
-                var result = await _webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-                if (result.MessageType == WebSocketMessageType.Close)
-                {
-                    await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
-                    MessageBox.Show("Disconnected from server.", "Connection", MessageBoxButton.OK, MessageBoxImage.Information);
-                    return;
-                }
-
-                var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
-                HandleServerMessage(message);
-            }
-        }
-
-        private void HandleServerMessage(string message)
-        {
-            if (message.StartsWith("PLAYER"))
-            {
-                // Example: "PLAYER:1"
-                _playerNumber = int.Parse(message.Split(':')[1]);
-                MessageBox.Show($"You are Player {_playerNumber}.", "Player Info", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-            else
-            {
-                // Handle other messages (e.g., moves, game state updates)
-                MessageBox.Show($"Server: {message}", "Message", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-        }
-
-        private async Task SendMessageAsync(string message)
-        {
-            if (_webSocket?.State == WebSocketState.Open)
-            {
-                var buffer = Encoding.UTF8.GetBytes(message);
-                await _webSocket.SendAsync(new ArraySegment<byte>(buffer), WebSocketMessageType.Text, true, CancellationToken.None);
-            }
-        }
-
-        private async void Window_Closed(object sender, EventArgs e)
-        {
-            if (_webSocket?.State == WebSocketState.Open)
-            {
-                await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
-            }
-        }
-
-        private async void SendMove(int row, int col)
-        {
-            var move = $"{row},{col}";
-            await SendMessageAsync(move);
-        }
-
-
-
         private void CheckStartGameButtonVisibility()
         {
             // Ha nincs elem a ShipListBox-ban, akkor a gomb megjelenik, különben elrejtjük
@@ -179,7 +99,32 @@ namespace TorpedoWpf
 
         private void RightButtonGrid_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show("Ellenfél oldala, ide nem pakolhatsz hajót", "Figyelmeztetés", MessageBoxButton.OK, MessageBoxImage.Warning);
+            if (!gameStarted)
+            {
+                MessageBox.Show("A játék még nem kezdődött el, nem lőhetsz az ellenfél mezőire!", "Figyelmeztetés", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            Button clickedButton = sender as Button;
+            int row = Grid.GetRow(clickedButton);
+            int col = Grid.GetColumn(clickedButton);
+
+            if (rightMap[row, col] == '1') // Találat
+            {
+                clickedButton.Background = Brushes.Green;
+                rightMap[row, col] = 'H'; // Jelöljük a találatot
+                MessageBox.Show("Találat! Eltaláltad az ellenfél hajóját!", "Találat", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            else if (rightMap[row, col] == '\0') // Tévesztés
+            {
+                clickedButton.Background = Brushes.Red;
+                rightMap[row, col] = 'M'; // Jelöljük a tévesztést
+                MessageBox.Show("Tévesztettél! Nincs hajó ezen a mezőn.", "Tévesztés", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            else
+            {
+                MessageBox.Show("Már lőttél erre a mezőre! Válassz másikat.", "Figyelmeztetés", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         private void ShipListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -436,11 +381,6 @@ namespace TorpedoWpf
             StartGameButton.Visibility = Visibility.Collapsed;
             gameStarted = true;
             MessageBox.Show("A játék elkezdődött! Mostantól nem változtathatod meg a hajók elhelyezését.", "Játék", MessageBoxButton.OK, MessageBoxImage.Information);
-
-            await SendMapToServer(leftMap);
-
-            // Optionally, notify the player that the map was sent
-            MessageBox.Show("Your map has been sent to the server!", "Game Info", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void Button_Click_1(object sender, RoutedEventArgs e)

@@ -38,6 +38,7 @@ namespace TorpedoWpf
             InitializeComponent();
             InitializeButtons(gPlayerField, leftMap, isLeftSide: true);
             InitializeButtons(gOpponentField, rightMap, isLeftSide: false);
+            InitializeLeftMap();
 
             // ListBox kiválasztásának eseménykezelője
             ShipListBox.SelectionChanged += ShipListBox_SelectionChanged;
@@ -49,6 +50,16 @@ namespace TorpedoWpf
         {
             // Ha nincs elem a ShipListBox-ban, akkor a gomb megjelenik, különben elrejtjük
             StartGameButton.Visibility = ShipListBox.Items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+        private void InitializeLeftMap()
+        {
+            // Ellenfél hajóinak elhelyezése (teszteléshez)
+            leftMap[2, 3] = '1'; // Hajó 1. része
+            leftMap[2, 4] = '1'; // Hajó 1. része
+            leftMap[5, 6] = '1'; // Hajó 2. része
+            leftMap[7, 8] = '1'; // Hajó 3. része
+            leftMap[9, 1] = '1'; // Hajó 4. része
+                                 // Adjon hozzá további adatokat teszteléshez
         }
         private void InitializeButtons(Grid grid, char[,] map, bool isLeftSide)
         {
@@ -73,11 +84,9 @@ namespace TorpedoWpf
 
                     if (isLeftSide)
                     {
-                        // Bal oldali mezők csak figyelmeztetést adnak
-                        button.Click += (sender, e) =>
-                        {
-                            MessageBox.Show("Ez a mező zárolva van. Csak a jobb oldalon helyezhetők el hajók.", "Figyelmeztetés", MessageBoxButton.OK, MessageBoxImage.Warning);
-                        };
+                        // Kezdetben a bal oldali gombokat letiltjuk, később a játék indításakor aktiváljuk
+                        button.IsEnabled = false;
+                        button.Click += (sender, e) => LeftButtonGrid_Click(sender, e); // Az ellenfél hajóira céloz
                     }
                     else
                     {
@@ -90,10 +99,38 @@ namespace TorpedoWpf
             }
         }
 
-        private void RightButtonGrid_Click(object sender, RoutedEventArgs e)
+
+        private void LeftButtonGrid_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show("Ellenfél oldala, ide nem pakolhatsz hajót", "Figyelmeztetés", MessageBoxButton.OK, MessageBoxImage.Warning);
+            if (!gameStarted)
+            {
+                MessageBox.Show("A játék még nem kezdődött el, nem lőhetsz az ellenfél mezőire!", "Figyelmeztetés", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            Button clickedButton = sender as Button;
+            int row = Grid.GetRow(clickedButton);
+            int col = Grid.GetColumn(clickedButton);
+
+            if (leftMap[row, col] == '1') // Találat
+            {
+                clickedButton.Background = Brushes.Green;
+                leftMap[row, col] = 'H'; // Jelöljük a találatot
+                MessageBox.Show("Találat! Eltaláltad az ellenfél hajóját!", "Találat", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            else if (leftMap[row, col] == '\0') // Tévesztés
+            {
+                clickedButton.Background = Brushes.Red;
+                leftMap[row, col] = 'M'; // Jelöljük a tévesztést
+                MessageBox.Show("Tévesztettél! Nincs hajó ezen a mezőn.", "Tévesztés", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            else
+            {
+                MessageBox.Show("Már lőttél erre a mezőre! Válassz másikat.", "Figyelmeztetés", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
+
+
 
         private void ShipListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -296,7 +333,15 @@ namespace TorpedoWpf
         {
             StartGameButton.Visibility = Visibility.Collapsed;
             gameStarted = true;
-            MessageBox.Show("A játék elkezdődött! Mostantól nem változtathatod meg a hajók elhelyezését.", "Játék", MessageBoxButton.OK, MessageBoxImage.Information);
+
+            // Bal oldali mezők aktiválása
+            foreach (Button button in gPlayerField.Children.OfType<Button>())
+            {
+                button.IsEnabled = true;
+            }
+
+            MessageBox.Show("A játék elkezdődött! Mostantól támadhatod az ellenfél hajóit.", "Játék", MessageBoxButton.OK, MessageBoxImage.Information);
         }
+
     }
 }
