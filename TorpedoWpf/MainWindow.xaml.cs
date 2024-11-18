@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Net.WebSockets;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
@@ -10,6 +11,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.Text.Json;
 
 namespace TorpedoWpf
 {
@@ -38,11 +40,16 @@ namespace TorpedoWpf
         private Ship currentShip = null;
         private List<Ship> placedShips = new List<Ship>();
 
+        private ClientWebSocket _webSocket;
+        private int _playerNumber;
+        private int _currentTurn = 1;
+
         public MainWindow()
         {
             InitializeComponent();
             InitializeButtons(LeftButtonGrid, leftMap, isLeftSide: true);
             InitializeButtons(RightButtonGrid, rightMap, isLeftSide: false);
+            InitializeWebSocket();
 
             // ListBox kiválasztásának eseménykezelője
             ShipListBox.SelectionChanged += ShipListBox_SelectionChanged;
@@ -50,6 +57,86 @@ namespace TorpedoWpf
             // Ellenőrizzük a gomb láthatóságát az inicializáláskor is
             CheckStartGameButtonVisibility();
         }
+
+        private async void InitializeWebSocket()
+        {
+            try
+            {
+                _webSocket = new ClientWebSocket();
+                await _webSocket.ConnectAsync(new Uri("ws://localhost:5000/"), CancellationToken.None);
+                MessageBox.Show("Connected to server!", "Connection", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                // Start listening for messages
+                _ = ListenToServer();
+
+                // Send a ready message to the server
+                await SendMessageAsync("READY");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to connect to server: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async Task ListenToServer()
+        {
+            var buffer = new byte[1024];
+
+            while (_webSocket.State == WebSocketState.Open)
+            {
+                var result = await _webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+                if (result.MessageType == WebSocketMessageType.Close)
+                {
+                    await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
+                    MessageBox.Show("Disconnected from server.", "Connection", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                HandleServerMessage(message);
+            }
+        }
+
+        private void HandleServerMessage(string message)
+        {
+            if (message.StartsWith("PLAYER"))
+            {
+                // Example: "PLAYER:1"
+                _playerNumber = int.Parse(message.Split(':')[1]);
+                MessageBox.Show($"You are Player {_playerNumber}.", "Player Info", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            else
+            {
+                // Handle other messages (e.g., moves, game state updates)
+                MessageBox.Show($"Server: {message}", "Message", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+        private async Task SendMessageAsync(string message)
+        {
+            if (_webSocket?.State == WebSocketState.Open)
+            {
+                var buffer = Encoding.UTF8.GetBytes(message);
+                await _webSocket.SendAsync(new ArraySegment<byte>(buffer), WebSocketMessageType.Text, true, CancellationToken.None);
+            }
+        }
+
+        private async void Window_Closed(object sender, EventArgs e)
+        {
+            if (_webSocket?.State == WebSocketState.Open)
+            {
+                await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
+            }
+        }
+
+        private async void SendMove(int row, int col)
+        {
+            var move = $"{row},{col}";
+            await SendMessageAsync(move);
+        }
+
+
+
         private void CheckStartGameButtonVisibility()
         {
             // Ha nincs elem a ShipListBox-ban, akkor a gomb megjelenik, különben elrejtjük
@@ -122,53 +209,67 @@ namespace TorpedoWpf
         {
             if (gameStarted)
             {
+                // If the game has started, prevent ship placement and handle game moves
                 MessageBox.Show("A játék elindult, nem változtathatod meg a hajók elhelyezését!", "Figyelmeztetés", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
+
+                if (_playerNumber != _currentTurn)
+                {
+                    MessageBox.Show("It's not your turn!", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                // Handle the move and send it to the server
+                SendMove(row, col);
+                return; // Exit to avoid executing ship placement logic
             }
-
-            var ship = placedShips.Find(s => s.Positions.Contains((row, col)));
-            if (ship != null)
+            else
             {
-                // Hajó eltávolítása a térképről és a listából
-                foreach (var pos in ship.Positions)
+                // Handle ship placement logic here
+                var ship = placedShips.Find(s => s.Positions.Contains((row, col)));
+                if (ship != null)
                 {
-                    map[pos.Row, pos.Col] = '\0'; // A mező visszaállítása üresre
-                    GetButtonFromGrid(LeftButtonGrid, pos.Row, pos.Col).Background = Brushes.LightGray; // A gomb színének visszaállítása
+                    // Remove the ship from the map and list
+                    foreach (var pos in ship.Positions)
+                    {
+                        map[pos.Row, pos.Col] = '\0'; // Reset cell
+                        GetButtonFromGrid(LeftButtonGrid, pos.Row, pos.Col).Background = Brushes.LightGray; // Reset button color
+                    }
+
+                    // Remove the ship from the placedShips list
+                    placedShips.Remove(ship);
+
+                    // Return the ship to the ShipListBox
+                    var shipItem = new ListBoxItem { Content = $"{ship.Length} mező hosszú" };
+                    ShipListBox.Items.Add(shipItem);
+
+                    // Re-enable the Start Game button if necessary
+                    CheckStartGameButtonVisibility();
+
+                    // Update adjacent cells to allow placement again
+                    MarkAdjacentCells(map);
+
+                    // Clear all "X" markings to prevent interference
+                    ClearAdjacentMarkings(map);
                 }
-
-                // Hajó eltávolítása a listából
-                placedShips.Remove(ship);
-
-                // A hajó visszakerül a listába a ShipListBox-ban
-                var shipItem = new ListBoxItem { Content = $"{ship.Length} mező hosszú" };
-                ShipListBox.Items.Add(shipItem);
-
-                // Visszaállítjuk a Játék gombot, ha szükséges
-                CheckStartGameButtonVisibility();
-
-                // Frissítjük a szomszédos mezők szabad állapotát, hogy újra le lehessen rakni őket
-                MarkAdjacentCells(map);
-
-                // Eltávolítjuk az összes "X" jelet, hogy ne befolyásolják a későbbi elhelyezést
-                ClearAdjacentMarkings(map);
-            }
-            else if (ShipListBox.SelectedItem != null && map[row, col] != '1' && map[row, col] != 'X')
-            {
-                if (firstSelection)
+                else if (ShipListBox.SelectedItem != null && map[row, col] != '1' && map[row, col] != 'X')
                 {
-                    PlaceShip(sender, map, row, col);
-                    firstSelection = false;
-                }
-                else if (IsAdjacentToSelected(map, row, col))
-                {
-                    PlaceShip(sender, map, row, col);
-                }
-                else
-                {
-                    MessageBox.Show("Csak szomszédos mezőt jelölhetsz ki!", "Hiba", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    if (firstSelection)
+                    {
+                        PlaceShip(sender, map, row, col);
+                        firstSelection = false;
+                    }
+                    else if (IsAdjacentToSelected(map, row, col))
+                    {
+                        PlaceShip(sender, map, row, col);
+                    }
+                    else
+                    {
+                        MessageBox.Show("Csak szomszédos mezőt jelölhetsz ki!", "Hiba", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
                 }
             }
         }
+
         private void ClearAdjacentMarkings(char[,] map)
         {
             for (int row = 0; row < 10; row++)
@@ -241,6 +342,53 @@ namespace TorpedoWpf
             }
         }
 
+        private string SerializeMap(char[,] map)
+        {
+            var rows = new List<string>();
+            for (int row = 0; row < map.GetLength(0); row++)
+            {
+                var rowContent = new StringBuilder();
+                for (int col = 0; col < map.GetLength(1); col++)
+                {
+                    // Replace null characters ('\0') with a placeholder (e.g., '0' for water)
+                    rowContent.Append(map[row, col] == '\0' ? '0' : map[row, col]);
+                }
+                rows.Add(rowContent.ToString());
+            }
+
+            // Convert the rows list to JSON
+            return JsonSerializer.Serialize(rows);
+        }
+
+        private async Task SendMapToServer(char[,] map)
+        {
+            if (_webSocket?.State == WebSocketState.Open)
+            {
+                // Serialize the map
+                var serializedMap = SerializeMap(map);
+
+                // Deserialize the JSON string back into an object
+                var mapObject = JsonSerializer.Deserialize<List<string>>(serializedMap);
+
+                // Create a message object
+                var message = new
+                {
+                    PlayerNumber = _playerNumber,
+                    Map = mapObject
+                };
+
+                // Convert message to JSON with indented formatting
+                var options = new JsonSerializerOptions
+                {
+                    WriteIndented = true // Enable indented formatting
+                };
+                var messageJson = JsonSerializer.Serialize(message, options);
+
+                // Send the message
+                var buffer = Encoding.UTF8.GetBytes(messageJson);
+                await _webSocket.SendAsync(new ArraySegment<byte>(buffer), WebSocketMessageType.Text, true, CancellationToken.None);
+            }
+        }
 
         private void MarkAdjacentCells(char[,] map)
         {
@@ -269,11 +417,16 @@ namespace TorpedoWpf
             return (Button)grid.Children[row * 10 + col];
         }
 
-        private void StartGameButton_Click(object sender, RoutedEventArgs e)
+        private async void StartGameButton_Click(object sender, RoutedEventArgs e)
         {
             StartGameButton.Visibility = Visibility.Collapsed;
             gameStarted = true;
             MessageBox.Show("A játék elkezdődött! Mostantól nem változtathatod meg a hajók elhelyezését.", "Játék", MessageBoxButton.OK, MessageBoxImage.Information);
+
+            await SendMapToServer(leftMap);
+
+            // Optionally, notify the player that the map was sent
+            MessageBox.Show("Your map has been sent to the server!", "Game Info", MessageBoxButton.OK, MessageBoxImage.Information);
         }
     }
 
