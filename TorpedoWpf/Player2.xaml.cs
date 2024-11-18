@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.WebSockets;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
@@ -32,6 +34,9 @@ namespace TorpedoWpf
 
         private Ship currentShip = null;
         private List<Ship> placedShips = new List<Ship>();
+        private ClientWebSocket _webSocket;
+        private int _playerNumber = 2;
+        private int _currentTurn = 1;
 
         public Player2()
         {
@@ -39,13 +44,84 @@ namespace TorpedoWpf
             InitializeButtons(gPlayerField, leftMap, isLeftSide: true);
             InitializeButtons(gOpponentField, rightMap, isLeftSide: false);
             InitializeLeftMap();
-
+            InitializeWebSocket();
             // ListBox kiválasztásának eseménykezelője
             ShipListBox.SelectionChanged += ShipListBox_SelectionChanged;
 
             // Ellenőrizzük a gomb láthatóságát az inicializáláskor is
             CheckStartGameButtonVisibility();
         }
+
+        private async void InitializeWebSocket()
+        {
+            try
+            {
+                _webSocket = new ClientWebSocket();
+                await _webSocket.ConnectAsync(new Uri("ws://localhost:5000/"), CancellationToken.None);
+                MessageBox.Show("Connected to server!", "Connection", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                _ = ListenToServer();
+                await SendMessageAsync("READY");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to connect to server: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async Task ListenToServer()
+        {
+            var buffer = new byte[1024];
+
+            while (_webSocket.State == WebSocketState.Open)
+            {
+                var result = await _webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+                if (result.MessageType == WebSocketMessageType.Close)
+                {
+                    await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
+                    MessageBox.Show("Disconnected from server.", "Connection", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                HandleServerMessage(message);
+            }
+        }
+
+        private void HandleServerMessage(string message)
+        {
+            if (message.StartsWith("MAP"))
+            {
+                var mapData = JsonSerializer.Deserialize<List<string>>(message.Split(':')[1]);
+                LoadMapFromData(mapData, leftMap, gPlayerField);
+            }
+            else
+            {
+                MessageBox.Show($"Server: {message}", "Message", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+        private void LoadMapFromData(List<string> mapData, char[,] map, Grid grid)
+        {
+            for (int row = 0; row < mapData.Count; row++)
+            {
+                for (int col = 0; col < mapData[row].Length; col++)
+                {
+                    map[row, col] = mapData[row][col];
+                    Button button = GetButtonFromGrid(grid, row, col);
+                    button.Background = map[row, col] == '1' ? Brushes.Blue : Brushes.LightGray;
+                }
+            }
+        }
+
+        private async Task SendMessageAsync(string message)
+        {
+            if (_webSocket?.State == WebSocketState.Open)
+            {
+                var buffer = Encoding.UTF8.GetBytes(message);
+                await _webSocket.SendAsync(new ArraySegment<byte>(buffer), WebSocketMessageType.Text, true, CancellationToken.None);
+            }
+        }
+
         private void CheckStartGameButtonVisibility()
         {
             // Ha nincs elem a ShipListBox-ban, akkor a gomb megjelenik, különben elrejtjük
@@ -317,30 +393,38 @@ namespace TorpedoWpf
         {
             foreach (UIElement element in grid.Children)
             {
-                if (element is Button button &&
-                    Grid.GetRow(button) == row &&
-                    Grid.GetColumn(button) == col)
+                if (element is Button button && Grid.GetRow(button) == row && Grid.GetColumn(button) == col)
                 {
                     return button;
                 }
             }
-
-            // Ha nincs ilyen gomb
-            throw new Exception($"A gomb a következő helyen nem található: sor {row}, oszlop {col}");
+            throw new Exception($"Button not found at row {row}, column {col}");
         }
 
-        private void StartGameButton_Click(object sender, RoutedEventArgs e)
+        private async void StartGameButton_Click(object sender, RoutedEventArgs e)
         {
-            StartGameButton.Visibility = Visibility.Collapsed;
             gameStarted = true;
+            StartGameButton.Visibility = Visibility.Collapsed;
 
-            // Bal oldali mezők aktiválása
-            foreach (Button button in gPlayerField.Children.OfType<Button>())
+            var serializedMap = SerializeMap(leftMap);
+            await SendMessageAsync($"MAP:{serializedMap}");
+
+            MessageBox.Show("Game started! Waiting for opponent's map.", "Game Start", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private string SerializeMap(char[,] map)
+        {
+            var rows = new List<string>();
+            for (int row = 0; row < 10; row++)
             {
-                button.IsEnabled = true;
+                var sb = new StringBuilder();
+                for (int col = 0; col < 10; col++)
+                {
+                    sb.Append(map[row, col] == '\0' ? '0' : map[row, col]);
+                }
+                rows.Add(sb.ToString());
             }
-
-            MessageBox.Show("A játék elkezdődött! Mostantól támadhatod az ellenfél hajóit.", "Játék", MessageBoxButton.OK, MessageBoxImage.Information);
+            return JsonSerializer.Serialize(rows);
         }
 
     }

@@ -49,12 +49,91 @@ namespace TorpedoWpf
             InitializeComponent();
             InitializeButtons(gPlayerField, leftMap, isLeftSide: true);
             InitializeButtons(gOpponentField, rightMap, isLeftSide: false);
-
+            InitializeWebSocket();
             // ListBox kiválasztásának eseménykezelője
             ShipListBox.SelectionChanged += ShipListBox_SelectionChanged;
 
             // Ellenőrizzük a gomb láthatóságát az inicializáláskor is
             CheckStartGameButtonVisibility();
+        }
+
+        private async void InitializeWebSocket()
+        {
+            try
+            {
+                _webSocket = new ClientWebSocket();
+                await _webSocket.ConnectAsync(new Uri("ws://localhost:5000/"), CancellationToken.None);
+                MessageBox.Show("Connected to server!", "Connection", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                _ = ListenToServer();
+                await SendMessageAsync("READY");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to connect to server: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async Task ListenToServer()
+        {
+            var buffer = new byte[1024];
+
+            while (_webSocket.State == WebSocketState.Open)
+            {
+                var result = await _webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+                if (result.MessageType == WebSocketMessageType.Close)
+                {
+                    await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
+                    MessageBox.Show("Disconnected from server.", "Connection", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                HandleServerMessage(message);
+            }
+        }
+
+        private void HandleServerMessage(string message)
+        {
+            if (message.StartsWith("MAP"))
+            {
+                var mapData = JsonSerializer.Deserialize<List<string>>(message.Split(':')[1]);
+                LoadMapFromData(mapData, rightMap, gOpponentField);
+            }
+            else
+            {
+                MessageBox.Show($"Server: {message}", "Message", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+        private async Task SendMessageAsync(string message)
+        {
+            if (_webSocket?.State == WebSocketState.Open)
+            {
+                var buffer = Encoding.UTF8.GetBytes(message);
+                await _webSocket.SendAsync(new ArraySegment<byte>(buffer), WebSocketMessageType.Text, true, CancellationToken.None);
+            }
+        }
+
+        private void LoadMapFromData(List<string> mapData, char[,] map, Grid grid)
+        {
+            for (int row = 0; row < mapData.Count; row++)
+            {
+                for (int col = 0; col < mapData[row].Length; col++)
+                {
+                    map[row, col] = mapData[row][col];
+                    Button button = GetButtonFromGrid(grid, row, col);
+                    button.Background = map[row, col] == '1' ? Brushes.Blue : Brushes.LightGray;
+                }
+            }
+        }
+
+        private async void Window_Closed(object sender, EventArgs e)
+        {
+            if (_webSocket?.State == WebSocketState.Open)
+            {
+                await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
+            }
         }
         private void CheckStartGameButtonVisibility()
         {
@@ -293,18 +372,15 @@ namespace TorpedoWpf
         private string SerializeMap(char[,] map)
         {
             var rows = new List<string>();
-            for (int row = 0; row < map.GetLength(0); row++)
+            for (int row = 0; row < 10; row++)
             {
-                var rowContent = new StringBuilder();
-                for (int col = 0; col < map.GetLength(1); col++)
+                var sb = new StringBuilder();
+                for (int col = 0; col < 10; col++)
                 {
-                    // Replace null characters ('\0') with a placeholder (e.g., '0' for water)
-                    rowContent.Append(map[row, col] == '\0' ? '0' : map[row, col]);
+                    sb.Append(map[row, col] == '\0' ? '0' : map[row, col]);
                 }
-                rows.Add(rowContent.ToString());
+                rows.Add(sb.ToString());
             }
-
-            // Convert the rows list to JSON
             return JsonSerializer.Serialize(rows);
         }
 
@@ -364,23 +440,24 @@ namespace TorpedoWpf
         {
             foreach (UIElement element in grid.Children)
             {
-                if (element is Button button &&
-                    Grid.GetRow(button) == row &&
-                    Grid.GetColumn(button) == col)
+                if (element is Button button && Grid.GetRow(button) == row && Grid.GetColumn(button) == col)
                 {
                     return button;
                 }
             }
-
-            // Ha nincs ilyen gomb
-            throw new Exception($"A gomb a következő helyen nem található: sor {row}, oszlop {col}");
+            throw new Exception($"Button not found at row {row}, column {col}");
         }
+
 
         private async void StartGameButton_Click(object sender, RoutedEventArgs e)
         {
             StartGameButton.Visibility = Visibility.Collapsed;
             gameStarted = true;
-            MessageBox.Show("A játék elkezdődött! Mostantól nem változtathatod meg a hajók elhelyezését.", "Játék", MessageBoxButton.OK, MessageBoxImage.Information);
+
+            var serializedMap = SerializeMap(leftMap);
+            await SendMessageAsync($"MAP:{serializedMap}");
+
+            MessageBox.Show("Game started! Waiting for opponent's map.", "Game Start", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void Button_Click_1(object sender, RoutedEventArgs e)
