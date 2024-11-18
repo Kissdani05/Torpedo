@@ -49,7 +49,7 @@ namespace TorpedoWpf
             InitializeComponent();
             InitializeButtons(gPlayerField, leftMap, isLeftSide: true);
             InitializeButtons(gOpponentField, rightMap, isLeftSide: false);
-
+            InitializeWebSocket();
             // ListBox kiválasztásának eseménykezelője
             ShipListBox.SelectionChanged += ShipListBox_SelectionChanged;
 
@@ -225,15 +225,16 @@ namespace TorpedoWpf
                     return;
                 }
 
-            var ship = placedShips.Find(s => s.Positions.Contains((row, col)));
-            if (ship != null)
-            {
-                // Hajó eltávolítása a térképről és a listából
-                foreach (var pos in ship.Positions)
+                // Check if the cell belongs to an existing ship
+                var ship = placedShips.Find(s => s.Positions.Contains((row, col)));
+                if (ship != null)
                 {
-                    map[pos.Row, pos.Col] = '\0'; // A mező visszaállítása üresre
-                    GetButtonFromGrid(gPlayerField, pos.Row, pos.Col).Background = Brushes.LightGray; // A gomb színének visszaállítása
-                }
+                    // Remove ship from the map and update its position visually
+                    foreach (var pos in ship.Positions)
+                    {
+                        map[pos.Row, pos.Col] = '\0'; // Reset the map cell to empty
+                        GetButtonFromGrid(gPlayerField, pos.Row, pos.Col).Background = Brushes.LightGray; // Reset button color
+                    }
 
                     // Remove the ship from the placedShips list
                     placedShips.Remove(ship);
@@ -251,24 +252,26 @@ namespace TorpedoWpf
                     // Clear all "X" markings to prevent interference
                     ClearAdjacentMarkings(map);
                 }
-                else if (ShipListBox.SelectedItem != null && map[row, col] != '1' && map[row, col] != 'X')
+            }
+            else if (ShipListBox.SelectedItem != null && map[row, col] != '1' && map[row, col] != 'X')
+            {
+                // Handle ship placement during setup
+                if (firstSelection)
                 {
-                    if (firstSelection)
-                    {
-                        PlaceShip(sender, map, row, col);
-                        firstSelection = false;
-                    }
-                    else if (IsAdjacentToSelected(map, row, col))
-                    {
-                        PlaceShip(sender, map, row, col);
-                    }
-                    else
-                    {
-                        MessageBox.Show("Csak szomszédos mezőt jelölhetsz ki!", "Hiba", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    }
+                    PlaceShip(sender, map, row, col);
+                    firstSelection = false; // Mark the first selection
+                }
+                else if (IsAdjacentToSelected(map, row, col))
+                {
+                    PlaceShip(sender, map, row, col); // Place ship if adjacent
+                }
+                else
+                {
+                    MessageBox.Show("Csak szomszédos mezőt jelölhetsz ki!", "Hiba", MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
             }
         }
+
 
         private void ClearAdjacentMarkings(char[,] map)
         {
@@ -444,6 +447,7 @@ namespace TorpedoWpf
         {
             Player2 player = new Player2();
             player.Show();
+            InitializeWebSocket();
         }
     }
 
