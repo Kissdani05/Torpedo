@@ -20,25 +20,51 @@
         </Grid.RowDefinitions>
 
         <!--fejléc-->
-        <StackPanel Grid.ColumnSpan="3" Orientation="Horizontal" Background="#3D5A80">
-            <TextBlock Text="Torpedó" FontSize="24" FontWeight="Bold" Foreground="#FFFFFF" Margin="5,0,0,5"/>
+        <StackPanel Grid.ColumnSpan="3" 
+                    Orientation="Horizontal" 
+                    Background="#3D5A80">
+            <TextBlock Text="Torpedó" 
+                       FontSize="24" 
+                       FontWeight="Bold" 
+                       Foreground="#FFFFFF" 
+                       Margin="5,0,0,5"/>
         </StackPanel>
 
         <!--"menü"-->
-        <StackPanel Grid.Row="1" Grid.Column="0" Background="#374357">
-            <TextBlock Text="Megmaradt hajók:" TextWrapping="Wrap" FontWeight="Bold" FontSize="16" Margin="5,0,0,10" Foreground="#FFFFFF"/>
-            <ListBox Name="ShipListBox" SelectionMode="Single" Background="#3D5A80" Foreground="#FFFFFF" Margin="0,0,0,10">
+        <StackPanel Grid.Row="1" 
+                    Grid.Column="0" 
+                    Background="#374357">
+            <TextBlock Text="Megmaradt hajók:" 
+                       TextWrapping="Wrap" 
+                       FontWeight="Bold" 
+                       FontSize="16" 
+                       Margin="5,0,0,10" 
+                       Foreground="#FFFFFF"/>
+            <ListBox Name="ShipListBox" 
+                     SelectionMode="Single" 
+                     Background="#3D5A80" 
+                     Foreground="#FFFFFF" 
+                     Margin="0,0,0,10">
                 <ListBoxItem Content="5 mező hosszú" />
                 <ListBoxItem Content="4 nező hosszú" />
                 <ListBoxItem Content="3 nező hosszú" />
                 <ListBoxItem Content="3 nező hosszú" />
                 <ListBoxItem Content="2 nező hosszú" />
             </ListBox>
-            <Button Name="StartGameButton" Content="START GAME" Width="100" Height="50" Margin="0,10,0,0" Visibility="Collapsed" Background="#4d648d" Foreground="#FFFFFF" Click="StartGameButton_Click" />
+            <Button Name="StartGameButton" 
+                    Content="START GAME" 
+                    Width="100" 
+                    Height="50" 
+                    Margin="0,10,0,0" 
+                    Visibility="Collapsed" 
+                    Background="#4d648d" 
+                    Foreground="#FFFFFF" 
+                    Click="StartGameButton_Click" />
         </StackPanel>
 
         <!--1. játékos-->
-        <Grid Grid.Row="1" Grid.Column="1">
+        <Grid Grid.Row="1" 
+              Grid.Column="1">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
@@ -51,7 +77,10 @@
                    VerticalContentAlignment="Center"
                    Content="1. játékos"
                    Margin="10" />
-            <Grid x:Name="gPlayerField" Grid.Row="1" Background="#acc2ef" Margin="10">
+            <Grid x:Name="gPlayerField" 
+                  Grid.Row="1" 
+                  Background="#acc2ef" 
+                  Margin="10">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition />
                     <ColumnDefinition />
@@ -80,7 +109,8 @@
         </Grid>
 
         <!--2. játékos-->
-        <Grid Grid.Row="1" Grid.Column="2">
+        <Grid Grid.Row="1" 
+              Grid.Column="2">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
@@ -93,7 +123,10 @@
                    VerticalContentAlignment="Center"
                    Content="2. játékos"
                    Margin="10" />
-            <Grid x:Name="gOpponentField" Grid.Row="1" Background="#acc2ef" Margin="10">
+            <Grid x:Name="gOpponentField" 
+                  Grid.Row="1" 
+                  Background="#acc2ef" 
+                  Margin="10">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition />
                     <ColumnDefinition />
@@ -121,8 +154,16 @@
             </Grid>
         </Grid>
 
-        <StackPanel Grid.Row="2" Grid.ColumnSpan="3" Orientation="Horizontal" Background="#3D5A80">
-            <Button Content="Player 2" Width="100" Height="30" Background="#4d648d" Foreground="#FFFFFF" Click="Button_Click_1" />
+        <StackPanel Grid.Row="2" 
+                    Grid.ColumnSpan="3" 
+                    Orientation="Horizontal" 
+                    Background="#3D5A80">
+            <Button Content="Player 2" 
+                    Width="100" 
+                    Height="30" 
+                    Background="#4d648d" 
+                    Foreground="#FFFFFF" 
+                    Click="Button_Click_1" />
         </StackPanel>
     </Grid>
 </Window>
