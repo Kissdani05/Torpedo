@@ -75,7 +75,7 @@
                    FontWeight="Bold"
                    HorizontalContentAlignment="Center"
                    VerticalContentAlignment="Center"
-                   Content="1. játékos"
+                   Content="Saját tábla"
                    Margin="10" />
             <Grid x:Name="gPlayerField" 
                   Grid.Row="1" 
@@ -121,7 +121,7 @@
                    FontWeight="Bold"
                    HorizontalContentAlignment="Center"
                    VerticalContentAlignment="Center"
-                   Content="2. játékos"
+                   Content="Ellenfél táblája"
                    Margin="10" />
             <Grid x:Name="gOpponentField" 
                   Grid.Row="1" 
@@ -164,6 +164,12 @@
                     Background="#4d648d" 
                     Foreground="#FFFFFF" 
                     Click="Button_Click_1" />
-        </StackPanel>
+			<Button Content="Start" 
+                 Width="100" 
+                 Height="30" 
+                 Background="#4d648d" 
+                 Foreground="#FFFFFF" 
+                 Margin="300 0 0 0"/>
+		</StackPanel>
     </Grid>
 </Window>
