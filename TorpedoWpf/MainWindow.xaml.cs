@@ -157,13 +157,15 @@ namespace TorpedoWpf
                 if (_playerNumber == _currentTurn) // Shooter's perspective
                 {
                     rightMap[row, col] = result == "HIT" ? 'H' : 'M';
-                    UpdateGridCell(gOpponentField, row, col, result == "HIT" ? Brushes.Green : Brushes.Red);
+                    UpdateGridCellContent(gOpponentField, row, col, result == "HIT" ? "🏳️" : "❌", 16,Brushes.Green);
+                    UpdateGridCell(gOpponentField, row, col, result == "HIT" ? Brushes.DarkGray : Brushes.DarkGray);
                     DebugWindow.Instance.AppendMessage($"Shot at ({row},{col}) was a {result}.");
                 }
                 else // Defender's perspective
                 {
                     leftMap[row, col] = result == "HIT" ? 'H' : 'M';
-                    UpdateGridCell(gPlayerField, row, col, result == "HIT" ? Brushes.Green : Brushes.Red);
+                    UpdateGridCellContent(gPlayerField, row, col, result == "HIT" ? "🏳️" : "❌",16, Brushes.Green);
+                    UpdateGridCell(gPlayerField, row, col, result == "HIT" ? Brushes.DarkGray : Brushes.DarkGray);
                     DebugWindow.Instance.AppendMessage($"Opponent shot at ({row},{col}) and it was a {result}.");
                 }
             }
@@ -261,17 +263,42 @@ namespace TorpedoWpf
                 {
                     if (element is Button button)
                     {
-                        button.Background = color;
-
-                        if (DebugWindow.Instance != null)
-                            DebugWindow.Instance.AppendMessage($"Updated cell at ({row}, {col}) to {color}.");
+                        button.Background = color; // Only update the background
                         return;
                     }
                 }
             }
 
-            if (DebugWindow.Instance != null)
-                DebugWindow.Instance.AppendMessage($"Button not found at ({row}, {col}).");
+            DebugWindow.Instance.AppendMessage($"Button not found at ({row}, {col}).");
+        }
+
+        private void UpdateGridCellContent(Grid grid, int row, int col, string content, int size, Brush color)
+        {
+            foreach (UIElement element in grid.Children)
+            {
+                if (Grid.GetRow(element) == row && Grid.GetColumn(element) == col)
+                {
+                    if (element is Button button)
+                    {
+                        // Update content and alignment
+                        button.Content = new TextBlock
+                        {
+                            Text = content,
+                            FontSize = content == "❌" ? size : size, // Larger for "X", slightly smaller for "𓊝"
+                            Foreground = content == "❌" ? Brushes.Red : color, // Red for "X", default for "𓊝"
+                            Margin = new Thickness(0, -18, 10, 0),
+                            TextAlignment = TextAlignment.Center // Center text alignment
+                        };
+
+                        // Optional: Adjust padding to minimize spacing
+                        button.Padding = new Thickness(0);
+
+                        return;
+                    }
+                }
+            }
+
+            DebugWindow.Instance.AppendMessage($"Button not found at ({row}, {col}).");
         }
         private async Task SendMessageAsync(string message)
         {
@@ -631,16 +658,14 @@ namespace TorpedoWpf
                 Button button = GetButtonFromGrid(gPlayerField, row, col);
                 if (button != null)
                 {
-                    button.Background = Brushes.Blue;
+                    button.Background = Brushes.DarkGray; // Optional, keep this for color
+                    UpdateGridCellContent(gPlayerField, row, col, "🚢",16,Brushes.Black); // Add ship emoji
                 }
 
                 ship.Positions.Add((row, col));
             }
 
-            // Add ship to placedShips list
             placedShips.Add(ship);
-
-            // Mark adjacent tiles as unavailable
             MarkAdjacentTiles(map, startRow, startCol, length, isHorizontal);
         }
         private Ship FindShipAtPosition(int row, int col)
