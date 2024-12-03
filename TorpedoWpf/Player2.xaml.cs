@@ -54,6 +54,7 @@ namespace TorpedoWpf
             }
 
             ShipListBox.SelectionChanged += ShipListBox_SelectionChanged;
+            InitializeShipListBox();
             CheckStartGameButtonVisibility();
         }
         private async void InitializeWebSocket()
@@ -76,6 +77,15 @@ namespace TorpedoWpf
             {
                 DebugWindow.Instance.AppendMessage($"Failed to connect to server: {ex.Message}");
             }
+        }
+        private void InitializeShipListBox()
+        {
+            ShipListBox.Items.Clear(); // Clear any existing items
+            ShipListBox.Items.Add(new ListBoxItem { Content = "5 mező hosszú" });
+            ShipListBox.Items.Add(new ListBoxItem { Content = "4 mező hosszú" });
+            ShipListBox.Items.Add(new ListBoxItem { Content = "3 mező hosszú" });
+            ShipListBox.Items.Add(new ListBoxItem { Content = "3 mező hosszú" });
+            ShipListBox.Items.Add(new ListBoxItem { Content = "2 mező hosszú" });
         }
         private async Task ListenToServer()
         {
@@ -189,6 +199,7 @@ namespace TorpedoWpf
         }
         private void ResetGameForRematch()
         {
+            ShipListBox.IsEnabled = true;
             gameStarted = false;
             RestartGameButton.Visibility = Visibility.Collapsed;
             GameOverText.Visibility = Visibility.Collapsed;
@@ -197,12 +208,20 @@ namespace TorpedoWpf
             ToggleOrientationButton.Visibility = Visibility.Visible;
 
             // Reset ships, fields, and allow repositioning
+            // Reset ships, fields, and allow repositioning
             placedShips.Clear();
             leftMap = new char[10, 10];
             rightMap = new char[10, 10];
-            ShipListBox.Items.Clear(); // Refill this as needed
+
+            // Reinitialize buttons for the grids
+            gPlayerField.Children.Clear();
+            gOpponentField.Children.Clear();
             InitializeButtons(gPlayerField, leftMap, isLeftSide: true);
             InitializeButtons(gOpponentField, rightMap, isLeftSide: false);
+
+            // Repopulate the ShipListBox with default ships
+            InitializeShipListBox();
+
             DebugWindow.Instance.AppendMessage("Game reset for rematch.");
         }
         private async void DisconnectFromServer()
