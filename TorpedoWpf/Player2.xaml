@@ -28,7 +28,7 @@
                     Foreground="#FFFFFF" 
                     Margin="5,0,0,5"/>
 			<TextBlock x:Name="GameOverText" HorizontalAlignment="Center" VerticalAlignment="Center" 
-                   FontSize="30" FontWeight="Bold" Foreground="Red" Visibility="Collapsed" Margin="300 0 0 0">
+                   FontSize="24" FontWeight="Bold" Foreground="Red" Visibility="Collapsed" Margin="300 0 0 0">
 			</TextBlock>
 		</StackPanel>
 
@@ -84,6 +84,15 @@
                  Background="#4d648d" 
                  Foreground="#FFFFFF" 
                  Click="StartGameButton_Click" />
+			<Button Name="RestartGameButton" 
+                 Content="RESTART GAME" 
+                 Width="100" 
+                 Height="25" 
+                 Margin="0,10,0,0" 
+                 Visibility="Collapsed" 
+                 Background="#4d648d" 
+                 Foreground="#FFFFFF" Click="RestartGameButton_Click" 
+                 />
 		</StackPanel>
 
 		<!--1. játékos-->

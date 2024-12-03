@@ -1,0 +1,16 @@
+﻿<Window x:Class="TorpedoWpf.CustomMessageBox"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Message" WindowStartupLocation="CenterOwner" 
+        ResizeMode="NoResize" WindowStyle="ToolWindow" SizeToContent="WidthAndHeight">
+	<Grid Margin="10">
+		<StackPanel>
+			<TextBlock x:Name="MessageText" Text="Message goes here." TextWrapping="Wrap" 
+                       Margin="0,0,0,10" FontSize="16" HorizontalAlignment="Center" />
+			<StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+				<Button x:Name="AcceptButton" Content="Accept" Width="80" Margin="5" Click="AcceptButton_Click"/>
+				<Button x:Name="RejectButton" Content="Reject" Width="80" Margin="5" Click="RejectButton_Click"/>
+			</StackPanel>
+		</StackPanel>
+	</Grid>
+</Window>

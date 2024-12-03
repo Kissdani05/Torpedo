@@ -56,7 +56,6 @@ namespace TorpedoWpf
             ShipListBox.SelectionChanged += ShipListBox_SelectionChanged;
             CheckStartGameButtonVisibility();
         }
-
         private async void InitializeWebSocket()
         {
             if (_webSocket != null && (_webSocket.State == WebSocketState.Open || _webSocket.State == WebSocketState.Connecting))
@@ -78,7 +77,6 @@ namespace TorpedoWpf
                 DebugWindow.Instance.AppendMessage($"Failed to connect to server: {ex.Message}");
             }
         }
-
         private async Task ListenToServer()
         {
             var buffer = new byte[1024];
@@ -158,14 +156,30 @@ namespace TorpedoWpf
             {
                 if (_currentTurn == _playerNumber)
                 {
-                    ShowGameOverMessage("Congratulation! You Won");
+                    ShowGameOverMessage("Congratulations! You Won");
                     GameOverText.Foreground = Brushes.Green;
+                    RestartGameButton.Visibility = Visibility.Visible;
                 }
                 else
                 {
                     ShowGameOverMessage("Game over! You lost");
                     GameOverText.Foreground = Brushes.Red;
+                    RestartGameButton.Visibility = Visibility.Visible;
                 }
+            }
+            else if (message == "REMATCH_REQUEST")
+            {
+                Application.Current.Dispatcher.Invoke(() => ShowRematchRequest());
+            }
+            else if (message == "REMATCH_ACCEPT")
+            {
+                ResetGameForRematch();
+                DebugWindow.Instance.AppendMessage("Opponent accepted rematch. Game reset.");
+            }
+            else if (message == "REMATCH_REJECT")
+            {
+                DisconnectFromServer();
+                DebugWindow.Instance.AppendMessage("Opponent rejected rematch. Disconnecting...");
             }
             else
             {
@@ -173,7 +187,32 @@ namespace TorpedoWpf
                     DebugWindow.Instance.AppendMessage($"Unhandled server message: {message}");
             }
         }
+        private void ResetGameForRematch()
+        {
+            gameStarted = false;
+            RestartGameButton.Visibility = Visibility.Collapsed;
+            GameOverText.Visibility = Visibility.Collapsed;
+            ShipListBox.Visibility = Visibility.Visible;
+            Megmaradhajok.Visibility = Visibility.Visible;
+            ToggleOrientationButton.Visibility = Visibility.Visible;
 
+            // Reset ships, fields, and allow repositioning
+            placedShips.Clear();
+            leftMap = new char[10, 10];
+            rightMap = new char[10, 10];
+            ShipListBox.Items.Clear(); // Refill this as needed
+            InitializeButtons(gPlayerField, leftMap, isLeftSide: true);
+            InitializeButtons(gOpponentField, rightMap, isLeftSide: false);
+            DebugWindow.Instance.AppendMessage("Game reset for rematch.");
+        }
+        private async void DisconnectFromServer()
+        {
+            if (_webSocket?.State == WebSocketState.Open)
+            {
+                await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Disconnecting", CancellationToken.None);
+            }
+            Application.Current.Shutdown();
+        }
         private void UpdateGridCell(Grid grid, int row, int col, Brush color)
         {
             foreach (UIElement element in grid.Children)
@@ -217,8 +256,6 @@ namespace TorpedoWpf
                 DebugWindow.Instance.AppendMessage("Cannot send message: WebSocket is not open.");
             }
         }
-
-
         private void LoadMapFromData(List<string> mapData, char[,] map, Grid grid)
         {
             for (int row = 0; row < mapData.Count; row++)
@@ -231,7 +268,6 @@ namespace TorpedoWpf
                 }
             }
         }
-
         private async void Window_Closed(object sender, EventArgs e)
         {
             if (_webSocket?.State == WebSocketState.Open)
@@ -307,7 +343,6 @@ namespace TorpedoWpf
             await SendMessageAsync($"SHOT:{row},{col}");
             DebugWindow.Instance.AppendMessage($"Shot fired at ({row}, {col}). Waiting for opponent's move...");
         }
-
         private void ShipListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (ShipListBox.SelectedItem != null)
@@ -315,7 +350,6 @@ namespace TorpedoWpf
                 SetShipLength();
             }
         }
-
         private void RemoveShipFromMap(int startRow, int startCol)
         {
             // Identify the ship at the clicked tile
@@ -351,9 +385,6 @@ namespace TorpedoWpf
 
             DebugWindow.Instance.AppendMessage($"Removed ship of length {ship.Length} from the map.");
         }
-
-
-
         private void SetShipLength()
         {
             var selectedItem = ShipListBox.SelectedItem as ListBoxItem;
@@ -372,8 +403,6 @@ namespace TorpedoWpf
                 }
             }
         }
-
-
         private void Button_Click(object sender, RoutedEventArgs e, char[,] map, int row, int col)
         {
             if (!gameStarted)
@@ -433,8 +462,6 @@ namespace TorpedoWpf
 
             DebugWindow.Instance.AppendMessage("Ship placed successfully.");
         }
-
-
         private void ClearAdjacentTilesForShip(char[,] map, Ship ship)
         {
             foreach (var position in ship.Positions)
@@ -472,7 +499,6 @@ namespace TorpedoWpf
                 }
             }
         }
-
         private bool IsAdjacentToAnotherShip(char[,] map, int row, int col)
         {
             for (int dr = -1; dr <= 1; dr++)
@@ -495,7 +521,6 @@ namespace TorpedoWpf
             }
             return false;
         }
-
         private bool CanPlaceShip(char[,] map, int startRow, int startCol, int length, bool isHorizontal)
         {
             for (int i = 0; i < length; i++)
@@ -540,8 +565,6 @@ namespace TorpedoWpf
 
             return true; // Valid placement
         }
-
-
         private void PlaceShip(char[,] map, int startRow, int startCol, int length, bool isHorizontal)
         {
             var ship = new Ship
@@ -573,13 +596,10 @@ namespace TorpedoWpf
             // Mark adjacent tiles as unavailable
             MarkAdjacentTiles(map, startRow, startCol, length, isHorizontal);
         }
-
         private Ship FindShipAtPosition(int row, int col)
         {
             return placedShips.FirstOrDefault(ship => ship.Positions.Any(pos => pos.Row == row && pos.Col == col));
         }
-
-
         private bool PlaceShipIfPossible(int row, int col, int length)
         {
             DebugWindow.Instance.AppendMessage($"Attempting to place ship at ({row}, {col}) in {(isHorizontal ? "horizontal" : "vertical")} orientation.");
@@ -596,7 +616,6 @@ namespace TorpedoWpf
             DebugWindow.Instance.AppendMessage($"Ship placed at ({row}, {col}) {(isHorizontal ? "horizontally" : "vertically")}.");
             return true;
         }
-
         private string SerializeMap(char[,] map)
         {
             var mapList = new List<string>();
@@ -611,7 +630,6 @@ namespace TorpedoWpf
             }
             return JsonSerializer.Serialize(mapList);
         }
-
         private async Task SendMapToServer(char[,] map)
         {
             if (_webSocket?.State == WebSocketState.Open)
@@ -655,8 +673,6 @@ namespace TorpedoWpf
                 }
             }
         }
-
-
         private Button GetButtonFromGrid(Grid grid, int row, int col)
         {
             foreach (UIElement element in grid.Children)
@@ -668,7 +684,6 @@ namespace TorpedoWpf
             }
             return null;
         }
-
         private void OnGridCellClick(object sender, RoutedEventArgs e)
         {
             if (ShipListBox.SelectedItem == null)
@@ -692,7 +707,6 @@ namespace TorpedoWpf
                 DebugWindow.Instance.AppendMessage("Removed ship from list after successful placement.");
             }
         }
-
         private void MarkAdjacentTiles(char[,] map, int startRow, int startCol, int length, bool isHorizontal)
         {
             for (int i = -1; i <= length; i++)
@@ -723,7 +737,6 @@ namespace TorpedoWpf
                 }
             }
         }
-
         private async void StartGameButton_Click(object sender, RoutedEventArgs e)
         {
             ShipListBox.IsEnabled = false;
@@ -741,13 +754,11 @@ namespace TorpedoWpf
             // Send READY message
             await SendMessageAsync("READY");
         }
-
         private void ShowGameOverMessage(string message)
         {
             GameOverText.Text = message;
             GameOverText.Visibility = Visibility.Visible;
         }
-
         private void Button_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
             Button button = sender as Button;
@@ -756,7 +767,6 @@ namespace TorpedoWpf
 
             RemoveShipFromMap(row, col);
         }
-
         private void RemovePlayerFieldDoubleClick()
         {
             foreach (UIElement element in gPlayerField.Children)
@@ -767,7 +777,6 @@ namespace TorpedoWpf
                 }
             }
         }
-
         private void DebugMapAndGrid()
         {
             DebugWindow.Instance.AppendMessage("Debugging leftMap:");
@@ -792,7 +801,6 @@ namespace TorpedoWpf
                 }
             }
         }
-
         private void SetGridButtonsEnabled(Grid grid, bool isEnabled)
         {
             foreach (UIElement element in grid.Children)
@@ -803,20 +811,46 @@ namespace TorpedoWpf
                 }
             }
         }
-
         private void Button_Click_1(object sender, RoutedEventArgs e)
         {
             Player2 player = new Player2();
             player.Show();
             InitializeWebSocket();
         }
-
         private void ToggleOrientationButton_Click(object sender, RoutedEventArgs e)
         {
             isHorizontal = !isHorizontal;
             ToggleOrientationButton.Content = isHorizontal ? "Switch to Vertical" : "Switch to Horizontal";
             DebugWindow.Instance.AppendMessage($"Ship orientation switched to {(isHorizontal ? "horizontal" : "vertical")}.");
         }
+        private void ShowRematchRequest()
+        {
+            var customMessageBox = new CustomMessageBox("Opponent requested a rematch. Do you accept?");
+            customMessageBox.Owner = this; // Set owner to center on this window
+            bool? result = customMessageBox.ShowDialog();
 
+            if (result == true) // Accept
+            {
+                SendMessageAsync("REMATCH_ACCEPT");
+                ResetGameForRematch();
+            }
+            else // Reject
+            {
+                SendMessageAsync("REMATCH_REJECT");
+                DisconnectFromServer();
+            }
+        }
+        private async void RestartGameButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_webSocket?.State == WebSocketState.Open)
+            {
+                await SendMessageAsync("REMATCH_REQUEST");
+                DebugWindow.Instance.AppendMessage("Rematch request sent.");
+            }
+            else
+            {
+                DebugWindow.Instance.AppendMessage("WebSocket is not open. Cannot send rematch request.");
+            }
+        }
     }
 }
