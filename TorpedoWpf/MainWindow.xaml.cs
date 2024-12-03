@@ -45,6 +45,7 @@ namespace TorpedoWpf
         private int _currentTurn = 1;
 
         private bool isHorizontal = true;
+        private bool bothPlayersReady = false;
 
         public MainWindow()
         {
@@ -110,7 +111,16 @@ namespace TorpedoWpf
                     }
 
                     var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
-                    HandleServerMessage(message);
+
+                    // Handle the server message (Game Not Ready)
+                    if (message == "GAME_NOT_READY")
+                    {
+                        DebugWindow.Instance.AppendMessage("Both players are not ready yet. Please wait for the game to start.");
+                    }
+                    else
+                    {
+                        HandleServerMessage(message); // Call your existing handler for other messages
+                    }
                 }
             }
             catch (WebSocketException ex)
@@ -271,7 +281,6 @@ namespace TorpedoWpf
 
             DebugWindow.Instance.AppendMessage($"Button not found at ({row}, {col}).");
         }
-
         private void UpdateGridCellContent(Grid grid, int row, int col, string content, int size, Brush color)
         {
             foreach (UIElement element in grid.Children)
@@ -389,15 +398,9 @@ namespace TorpedoWpf
         }
         private async void RightButtonGrid_Click(object sender, RoutedEventArgs e)
         {
-            if (!gameStarted)
+            if (!gameStarted || _currentTurn != _playerNumber)
             {
-                DebugWindow.Instance.AppendMessage("The game hasn't started yet.");
-                return;
-            }
-
-            if (_currentTurn != _playerNumber)
-            {
-                DebugWindow.Instance.AppendMessage("It's not your turn!");
+                DebugWindow.Instance.AppendMessage("It's not your turn or the game hasn't started yet.");
                 return;
             }
 
@@ -407,12 +410,14 @@ namespace TorpedoWpf
             int row = Grid.GetRow(clickedButton);
             int col = Grid.GetColumn(clickedButton);
 
+            // Ensure the player hasn't shot this cell before
             if (rightMap[row, col] == 'H' || rightMap[row, col] == 'M')
             {
                 DebugWindow.Instance.AppendMessage($"Already fired at ({row}, {col}). Choose another cell.");
                 return;
             }
 
+            // Send the shot to the server
             await SendMessageAsync($"SHOT:{row},{col}");
             DebugWindow.Instance.AppendMessage($"Shot fired at ({row}, {col}). Waiting for opponent's move...");
         }
