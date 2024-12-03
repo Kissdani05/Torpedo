@@ -154,15 +154,25 @@ namespace TorpedoWpf
                     DebugWindow.Instance.AppendMessage($"Opponent shot at ({row},{col}) and it was a {result}.");
                 }
             }
+            else if (message == "Game Over!")
+            {
+                if (_currentTurn == _playerNumber)
+                {
+                    ShowGameOverMessage("Congratulation! You Won");
+                    GameOverText.Foreground = Brushes.Green;
+                }
+                else
+                {
+                    ShowGameOverMessage("Game over! You lost");
+                    GameOverText.Foreground = Brushes.Red;
+                }
+            }
             else
             {
                 if (DebugWindow.Instance != null)
                     DebugWindow.Instance.AppendMessage($"Unhandled server message: {message}");
             }
         }
-
-
-
 
         private void UpdateGridCell(Grid grid, int row, int col, Brush color)
         {
@@ -720,6 +730,9 @@ namespace TorpedoWpf
             SetGridButtonsEnabled(gOpponentField, true);
             RemovePlayerFieldDoubleClick();
             StartGameButton.Visibility = Visibility.Collapsed;
+            ShipListBox.Visibility = Visibility.Collapsed;
+            Megmaradhajok.Visibility = Visibility.Collapsed;
+            ToggleOrientationButton.Visibility = Visibility.Collapsed;
             gameStarted = true;
 
             await SendMapToServer(leftMap);
@@ -727,6 +740,12 @@ namespace TorpedoWpf
 
             // Send READY message
             await SendMessageAsync("READY");
+        }
+
+        private void ShowGameOverMessage(string message)
+        {
+            GameOverText.Text = message;
+            GameOverText.Visibility = Visibility.Visible;
         }
 
         private void Button_MouseDoubleClick(object sender, MouseButtonEventArgs e)

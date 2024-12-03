@@ -28,13 +28,17 @@
                        FontWeight="Bold" 
                        Foreground="#FFFFFF" 
                        Margin="5,0,0,5"/>
-        </StackPanel>
+			<TextBlock x:Name="GameOverText" HorizontalAlignment="Center" VerticalAlignment="Center" 
+                   FontSize="30" FontWeight="Bold" Foreground="Red" Visibility="Collapsed" Margin="300 0 0 0">
+			</TextBlock>
+		</StackPanel>
 
         <!--"menü"-->
-        <StackPanel Grid.Row="1" 
+		<StackPanel Grid.Row="1" 
                     Grid.Column="0" 
                     Background="#374357">
-            <TextBlock Text="Megmaradt hajók:" 
+			<TextBlock x:Name="Megmaradhajok"
+			        Text="Megmaradt hajók:" 
                        TextWrapping="Wrap" 
                        FontWeight="Bold" 
                        FontSize="16" 

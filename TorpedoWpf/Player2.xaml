@@ -27,23 +27,30 @@
                     FontWeight="Bold" 
                     Foreground="#FFFFFF" 
                     Margin="5,0,0,5"/>
+			<TextBlock x:Name="GameOverText" HorizontalAlignment="Center" VerticalAlignment="Center" 
+                   FontSize="30" FontWeight="Bold" Foreground="Red" Visibility="Collapsed" Margin="300 0 0 0">
+			</TextBlock>
 		</StackPanel>
 
 		<!--"menü"-->
 		<StackPanel Grid.Row="1" 
                  Grid.Column="0" 
                  Background="#374357">
-			<TextBlock Text="Megmaradt hajók:" 
+			<TextBlock
+				x:Name="Megmaradhajok"
+				Text="Megmaradt hajók:" 
                     TextWrapping="Wrap" 
                     FontWeight="Bold" 
                     FontSize="16" 
                     Margin="5,0,0,10" 
-                    Foreground="#FFFFFF"/>
+                    Foreground="#FFFFFF"
+				Visibility="Visible"/>
 			<ListBox Name="ShipListBox" 
                   SelectionMode="Single" 
                   Background="#3D5A80" 
                   Foreground="#FFFFFF" 
-                  Margin="0,0,0,10">
+                  Margin="0,0,0,10"
+			   Visibility="Visible">
 				<ListBoxItem Content="5 mező hosszú" />
 				<ListBoxItem Content="4 nező hosszú" />
 				<ListBoxItem Content="3 nező hosszú" />
