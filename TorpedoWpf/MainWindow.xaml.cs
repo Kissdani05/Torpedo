@@ -209,57 +209,62 @@ namespace TorpedoWpf
             // Handle SUNK_SHIP message
             else if (message.StartsWith("SUNK_SHIP:"))
             {
-                var resultData = message.Substring(10).Split(','); // Splitting the first part: row, col (if any)
+                var resultData = message.Substring(10).Split(';'); // Splitting the first part: row, col (if any)
 
-                // Check if the resultData has more than 1 part for ship positions
+                //Check if the resultData has more than 1 part for ship positions
                 if (resultData.Length > 1)
-                {
-                    // We expect the ship positions to be after the row and col
-                    var sunkPositionsData = resultData[1].Split(';'); // Splitting the positions part by semicolon (;)
-                    List<(int Row, int Col)> sunkShipPositions = new List<(int, int)>();
-
-                    // Loop through each position and parse it
-                    foreach (var pos in sunkPositionsData)
                     {
-                        var coords = pos.Split(',');
-                        if (coords.Length == 2)
+                        // We expect the ship positions to be after the row and col
+                        var sunkPositionsData = resultData[1].Split(';'); // Splitting the positions part by semicolon (;)
+                        foreach (var item in sunkPositionsData)
                         {
-                            try
+                            DebugWindow.Instance.AppendMessage($"sunkPositionsData: {item}");
+                        }
+                        List<(int Row, int Col)> sunkShipPositions = new List<(int, int)>();
+
+                        // Loop through each position and parse it
+                        foreach (var pos in sunkPositionsData)
+                        {
+                            DebugWindow.Instance.AppendMessage($"Foreach loop: {pos}");
+                            var coords = pos.Split(',');
+                            if (coords.Length == 2)
                             {
-                                int posRow = int.Parse(coords[0]);
-                                int posCol = int.Parse(coords[1]);
-                                sunkShipPositions.Add((posRow, posCol));
+                                try
+                                {
+                                    int posRow = int.Parse(coords[0]);
+                                    int posCol = int.Parse(coords[1]);
+                                    sunkShipPositions.Add((posRow, posCol));
+                                }
+                                catch (FormatException ex)
+                                {
+                                    DebugWindow.Instance.AppendMessage($"Error parsing position '{pos}': {ex.Message}");
+                                }
                             }
-                            catch (FormatException ex)
+                            else
                             {
-                                DebugWindow.Instance.AppendMessage($"Error parsing position '{pos}': {ex.Message}");
+                                DebugWindow.Instance.AppendMessage($"Unexpected position format: {pos}");
                             }
                         }
-                        else
+
+                        // Log ship positions for debugging
+                        DebugWindow.Instance.AppendMessage($"Sunk Ship Positions: {string.Join(", ", sunkShipPositions.Select(pos => $"({pos.Row}, {pos.Col})"))}");
+
+                        // Mark adjacent tiles
+                        if (_playerNumber == _currentTurn) // Shooter's perspective
                         {
-                            DebugWindow.Instance.AppendMessage($"Unexpected position format: {pos}");
+                            MarkAdjacentTilesAfterSinking(rightMap, sunkShipPositions, gOpponentField);
+                            DebugWindow.Instance.AppendMessage("You sunk a ship! Marking adjacent tiles.");
+                        }
+                        else // Defender's perspective
+                        {
+                            MarkAdjacentTilesAfterSinking(leftMap, sunkShipPositions, gPlayerField);
+                            DebugWindow.Instance.AppendMessage("Your ship was sunk! Marking adjacent tiles.");
                         }
                     }
-
-                    // Log ship positions for debugging
-                    DebugWindow.Instance.AppendMessage($"Sunk Ship Positions: {string.Join(", ", sunkShipPositions.Select(pos => $"({pos.Row}, {pos.Col})"))}");
-
-                    // Mark adjacent tiles
-                    if (_playerNumber == _currentTurn) // Shooter's perspective
+                    else
                     {
-                        MarkAdjacentTilesAfterSinking(rightMap, sunkShipPositions, gOpponentField);
-                        DebugWindow.Instance.AppendMessage("You sunk a ship! Marking adjacent tiles.");
+                        DebugWindow.Instance.AppendMessage("Error: SUNK_SHIP message is malformed or incomplete.");
                     }
-                    else // Defender's perspective
-                    {
-                        MarkAdjacentTilesAfterSinking(leftMap, sunkShipPositions, gPlayerField);
-                        DebugWindow.Instance.AppendMessage("Your ship was sunk! Marking adjacent tiles.");
-                    }
-                }
-                else
-                {
-                    DebugWindow.Instance.AppendMessage("Error: SUNK_SHIP message is malformed or incomplete.");
-                }
             }
             // Handle other messages (Game Over, Rematch requests)
             else if (message == "Game Over!")
@@ -306,7 +311,6 @@ namespace TorpedoWpf
                 map[row, col] = status; // Set 'H' for hit or 'M' for miss
             }
         }
-
         private void ShowRematchRequest()
         {
             var customMessageBox = new CustomMessageBox("Opponent requested a rematch. Do you accept?");
