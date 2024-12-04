@@ -5,7 +5,8 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:TorpedoWpf"
         mc:Ignorable="d"
-        Title="Player2" Height="450" Width="800">
+        Title="Player2" Height="450" Width="800"
+        Background="#1F3A5F">
 	<Grid>
 		<Grid.ColumnDefinitions>
 			<ColumnDefinition Width="2*" />
