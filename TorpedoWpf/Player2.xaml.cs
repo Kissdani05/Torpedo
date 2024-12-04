@@ -136,6 +136,7 @@ namespace TorpedoWpf
             if (DebugWindow.Instance != null)
                 DebugWindow.Instance.AppendMessage($"Received message: {message}");
 
+            // Handle TURN message
             if (message.StartsWith("TURN:"))
             {
                 int turn = int.Parse(message.Split(':')[1]);
@@ -152,6 +153,8 @@ namespace TorpedoWpf
                     DebugWindow.Instance.AppendMessage("Waiting for opponent's move...");
                 }
             }
+
+            // Handle SHOT_RESULT message
             else if (message.StartsWith("SHOT_RESULT:"))
             {
                 var resultData = message.Substring(12).Split(',');
@@ -159,21 +162,100 @@ namespace TorpedoWpf
                 int col = int.Parse(resultData[1]);
                 string result = resultData[2];
 
-                if (_playerNumber == _currentTurn) // Shooter's perspective
+                if (result == "SUNK")
                 {
-                    rightMap[row, col] = result == "HIT" ? 'H' : 'M';
-                    UpdateGridCell(gOpponentField, row, col, result == "HIT" ? Brushes.DarkGray : Brushes.DarkGray);
-                    UpdateGridCellContent(gOpponentField, row, col, result == "HIT" ? "🏳️" : "❌", 16, Brushes.Green);
-                    DebugWindow.Instance.AppendMessage($"Shot at ({row},{col}) was a {result}.");
+                    // Log that the ship is sunk
+                    DebugWindow.Instance.AppendMessage($"Ship sunk at ({row}, {col})");
+
+                    // No ship positions are included in this message, we will get them separately
                 }
-                else // Defender's perspective
+                else if (result == "HIT" || result == "MISS")
                 {
-                    leftMap[row, col] = result == "HIT" ? 'H' : 'M';
-                    UpdateGridCell(gPlayerField, row, col, result == "HIT" ? Brushes.DarkGray : Brushes.DarkGray);
-                    UpdateGridCellContent(gPlayerField, row, col, result == "HIT" ? "🏳️" : "❌", 16, Brushes.Green);
-                    DebugWindow.Instance.AppendMessage($"Opponent shot at ({row},{col}) and it was a {result}.");
+                    // Handle regular shots (hit or miss)
+                    if (_playerNumber == _currentTurn) // Shooter's perspective
+                    {
+                        UpdateGridCellSafely(gOpponentField, row, col, result == "HIT" ? "🏳️" : "❌", rightMap, result == "HIT" ? 'H' : 'M');
+                        if (result == "MISS")
+                        {
+                            _currentTurn = _currentTurn == 1 ? 2 : 1; // Switch turn only on miss
+                            TurnLabel.Content = "Opponent's Turn";
+                            DebugWindow.Instance.AppendMessage("Missed! Turn switched to opponent.");
+                        }
+                        else
+                        {
+                            TurnLabel.Content = "Your Turn";
+                            DebugWindow.Instance.AppendMessage("Hit! Continue your turn.");
+                        }
+                    }
+                    else // Defender's perspective
+                    {
+                        UpdateGridCellSafely(gPlayerField, row, col, result == "HIT" ? "🏳️" : "❌", leftMap, result == "HIT" ? 'H' : 'M');
+                        if (result == "MISS")
+                        {
+                            _currentTurn = _currentTurn == 1 ? 2 : 1; // Switch turn only on miss
+                            TurnLabel.Content = "Your Turn";
+                            DebugWindow.Instance.AppendMessage("Opponent missed! Your turn.");
+                        }
+                    }
                 }
             }
+            // Handle SUNK_SHIP message
+            else if (message.StartsWith("SUNK_SHIP:"))
+            {
+                var resultData = message.Substring(10).Split(','); // Splitting the first part: row, col (if any)
+
+                // Check if the resultData has more than 1 part for ship positions
+                if (resultData.Length > 1)
+                {
+                    // We expect the ship positions to be after the row and col
+                    var sunkPositionsData = resultData[1].Split(';'); // Splitting the positions part by semicolon (;)
+                    List<(int Row, int Col)> sunkShipPositions = new List<(int, int)>();
+
+                    // Loop through each position and parse it
+                    foreach (var pos in sunkPositionsData)
+                    {
+                        var coords = pos.Split(',');
+                        if (coords.Length == 2)
+                        {
+                            try
+                            {
+                                int posRow = int.Parse(coords[0]);
+                                int posCol = int.Parse(coords[1]);
+                                sunkShipPositions.Add((posRow, posCol));
+                            }
+                            catch (FormatException ex)
+                            {
+                                DebugWindow.Instance.AppendMessage($"Error parsing position '{pos}': {ex.Message}");
+                            }
+                        }
+                        else
+                        {
+                            DebugWindow.Instance.AppendMessage($"Unexpected position format: {pos}");
+                        }
+                    }
+
+                    // Log ship positions for debugging
+                    DebugWindow.Instance.AppendMessage($"Sunk Ship Positions: {string.Join(", ", sunkShipPositions.Select(pos => $"({pos.Row}, {pos.Col})"))}");
+
+                    // Mark adjacent tiles
+                    if (_playerNumber == _currentTurn) // Shooter's perspective
+                    {
+                        MarkAdjacentTilesAfterSinking(rightMap, sunkShipPositions, gOpponentField);
+                        DebugWindow.Instance.AppendMessage("You sunk a ship! Marking adjacent tiles.");
+                    }
+                    else // Defender's perspective
+                    {
+                        MarkAdjacentTilesAfterSinking(leftMap, sunkShipPositions, gPlayerField);
+                        DebugWindow.Instance.AppendMessage("Your ship was sunk! Marking adjacent tiles.");
+                    }
+                }
+                else
+                {
+                    DebugWindow.Instance.AppendMessage("Error: SUNK_SHIP message is malformed or incomplete.");
+                }
+            }
+
+            // Handle other messages (Game Over, Rematch requests)
             else if (message == "Game Over!")
             {
                 if (_currentTurn == _playerNumber)
@@ -207,6 +289,15 @@ namespace TorpedoWpf
             {
                 if (DebugWindow.Instance != null)
                     DebugWindow.Instance.AppendMessage($"Unhandled server message: {message}");
+            }
+        }
+        private void UpdateGridCellSafely(Grid grid, int row, int col, string content, char[,] map, char status)
+        {
+            // Prevent overwriting a ship part that's already been hit
+            if (map[row, col] != 'H' && map[row, col] != '1') // '1' indicates ship part, 'H' indicates already hit
+            {
+                UpdateGridCellContent(grid, row, col, content, 16, Brushes.Green);
+                map[row, col] = status; // Set 'H' for hit or 'M' for miss
             }
         }
         private void ResetGameForRematch()
@@ -352,7 +443,7 @@ namespace TorpedoWpf
                     {
                         Width = 40,
                         Height = 40,
-                        Background = Brushes.LightGray
+                        Background = Brushes.LightBlue
                     };
 
                     Grid.SetRow(button, row);
@@ -641,7 +732,6 @@ namespace TorpedoWpf
                 Button button = GetButtonFromGrid(gPlayerField, row, col);
                 if (button != null)
                 {
-                    button.Background = Brushes.DarkGray; // Optional, keep this for color
                     UpdateGridCellContent(gPlayerField, row, col, "🚢", 16, Brushes.Black); // Add ship emoji
                 }
 
@@ -785,12 +875,66 @@ namespace TorpedoWpf
                             Button button = GetButtonFromGrid(gPlayerField, row, col);
                             if (button != null)
                             {
-                                button.Background = Brushes.DarkGray; // Visual marking
+                                button.Content = new TextBlock
+                                {
+                                    Text = "❌",
+                                    FontSize = 16, // Larger for "X", slightly smaller for "𓊝"
+                                    Foreground = Brushes.Red, // Red for "X", default for "𓊝"
+                                    Margin = new Thickness(0, -18, 10, 0),
+                                    TextAlignment = TextAlignment.Center // Center text alignment
+                                };
                             }
                         }
                     }
                 }
             }
+        }
+        private void MarkAdjacentTilesAfterSinking(char[,] map, List<(int Row, int Col)> sunkShipPositions, Grid grid)
+        {
+            foreach (var position in sunkShipPositions)
+            {
+                int startRow = position.Row;
+                int startCol = position.Col;
+
+                // Iterate through all adjacent cells (including diagonals)
+                for (int dr = -1; dr <= 1; dr++)
+                {
+                    for (int dc = -1; dc <= 1; dc++)
+                    {
+                        int adjRow = startRow + dr;
+                        int adjCol = startCol + dc;
+
+                        // Ensure the tile is within bounds
+                        if (IsWithinBounds(adjRow, adjCol))
+                        {
+                            // Skip ship parts (part of the same ship) and already hit parts
+                            if (map[adjRow, adjCol] == '1' || map[adjRow, adjCol] == 'H')
+                                continue;
+
+                            // Only mark empty tiles (water) as unavailable
+                            if (map[adjRow, adjCol] == 'E')
+                            {
+                                map[adjRow, adjCol] = 'X'; // Mark as unavailable
+                                UpdateGridCellContent(grid, adjRow, adjCol, "❌", 16, Brushes.Gray); // Visual marking
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        private bool IsWithinBounds(int row, int col)
+        {
+            return row >= 0 && row < 10 && col >= 0 && col < 10;
+        }
+        private bool IsShipSunk(char[,] map, Ship ship)
+        {
+            return ship.Positions.All(position => map[position.Row, position.Col] == 'H');
+        }
+        private Ship FindShipAtPosition(int row, int col, char[,] map)
+        {
+            // Find the ship that contains the clicked position
+            return placedShips.FirstOrDefault(ship =>
+                ship.Positions.Any(pos => pos.Row == row && pos.Col == col));
         }
         private async void StartGameButton_Click(object sender, RoutedEventArgs e)
         {
@@ -805,6 +949,8 @@ namespace TorpedoWpf
 
             await SendMapToServer(leftMap);
             DebugWindow.Instance.AppendMessage("Map sent to the server. Waiting for opponent.");
+
+            ReplaceXWithE(leftMap, gPlayerField);
 
             // Send READY message
             await SendMessageAsync("READY");
@@ -907,5 +1053,31 @@ namespace TorpedoWpf
                 DebugWindow.Instance.AppendMessage("WebSocket is not open. Cannot send rematch request.");
             }
         }
+        private void ReplaceXWithE(char[,] map, Grid grid)
+        {
+            for (int row = 0; row < map.GetLength(0); row++)
+            {
+                for (int col = 0; col < map.GetLength(1); col++)
+                {
+                    if (map[row, col] == 'X')
+                    {
+                        // Replace 'X' with 'E' in the logical map
+                        map[row, col] = 'E';
+
+                        // Update the corresponding button on the grid
+                        Button button = GetButtonFromGrid(grid, row, col);
+                        if (button != null)
+                        {
+                            button.Content = new TextBlock
+                            {
+                                Foreground = Brushes.Blue,
+                            };
+                            button.Background = Brushes.LightBlue; // Optional background for water
+                        }
+                    }
+                }
+            }
+        }
+
     }
 }
